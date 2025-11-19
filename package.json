@@ -1,0 +1,13 @@
+{
+  "name": "simple-ci-cd-webhook",
+  "version": "1.0.0",
+  "description": "A simple webhook server for CI/CD",
+  "main": "cicd.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "body-parser": "^1.20.2"
+  }
+}
