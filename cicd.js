@@ -81,6 +81,11 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
 });
 
+// Redirect root to h4nk.com
+app.get('/', (req, res) => {
+    res.redirect('https://h4nk.com');
+});
+
 // Webhook endpoint
 // Apply the signature verification middleware before processing the webhook
 app.post('/webhook', verifyGitHubWebhook, (req, res) => {
