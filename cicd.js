@@ -8,6 +8,12 @@ const bodyParser = require('body-parser'); // Added for parsing raw request body
 const app = express();
 const port = 5000;
 
+// Simple request logger middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // IMPORTANT: Store your secret securely, e.g., in an environment variable.
 // This secret must match the one configured in your GitHub webhook settings.
 const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
