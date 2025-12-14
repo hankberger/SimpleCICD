@@ -2,8 +2,16 @@ const express = require('express');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto'); // Added for webhook signature validation
-const bodyParser = require('body-parser'); // Added for parsing raw request body
+const crypto = require('crypto');
+const bodyParser = require('body-parser');
+const http = require('http');
+
+// Minecraft server proxy config
+const MINECRAFT_SERVER = {
+    host: '75.100.4.245',
+    port: 3000,
+    apiKey: 'minecraft-restart!'
+};
 
 const app = express();
 const port = 5000;
@@ -17,6 +25,9 @@ app.use((req, res, next) => {
 // IMPORTANT: Store your secret securely, e.g., in an environment variable.
 // This secret must match the one configured in your GitHub webhook settings.
 const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
+
+// API key for phone/general automation endpoints (separate from GitHub webhook auth)
+const API_KEY = process.env.API_KEY;
 
 // Middleware to parse raw body for signature verification
 // GitHub webhooks send 'application/json', so we need to ensure the raw body is available.
@@ -82,6 +93,43 @@ function verifyGitHubWebhook(req, res, next) {
     next();
 }
 
+// Middleware to validate API key for phone/general automation endpoints
+function verifyApiKey(req, res, next) {
+    if (!API_KEY) {
+        console.error('API_KEY is not set. Rejecting request.');
+        return res.status(500).json({ error: 'Server misconfigured: API_KEY not set' });
+    }
+
+    // Accept API key from Authorization header (Bearer token) or X-API-Key header
+    const authHeader = req.get('Authorization');
+    const apiKeyHeader = req.get('X-API-Key');
+
+    let providedKey = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        providedKey = authHeader.slice(7); // Remove 'Bearer ' prefix
+    } else if (apiKeyHeader) {
+        providedKey = apiKeyHeader;
+    }
+
+    if (!providedKey) {
+        console.warn('Request without API key. Rejecting.');
+        return res.status(401).json({ error: 'Unauthorized: API key required' });
+    }
+
+    // Use timing-safe comparison to prevent timing attacks
+    const keyBuffer = Buffer.from(providedKey);
+    const apiKeyBuffer = Buffer.from(API_KEY);
+
+    if (keyBuffer.length !== apiKeyBuffer.length || !crypto.timingSafeEqual(keyBuffer, apiKeyBuffer)) {
+        console.warn('Invalid API key provided. Rejecting.');
+        return res.status(403).json({ error: 'Forbidden: Invalid API key' });
+    }
+
+    console.log('API key successfully validated.');
+    next();
+}
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
@@ -128,7 +176,65 @@ app.post('/webhook', verifyGitHubWebhook, (req, res) => {
     }
 });
 
+// Proxy helper function for Minecraft server
+function proxyToMinecraft(targetPath, res) {
+    const options = {
+        hostname: MINECRAFT_SERVER.host,
+        port: MINECRAFT_SERVER.port,
+        path: targetPath,
+        method: 'GET',
+        headers: {
+            'X-API-Key': MINECRAFT_SERVER.apiKey
+        }
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+        let data = '';
+        proxyRes.on('data', chunk => data += chunk);
+        proxyRes.on('end', () => {
+            res.status(proxyRes.statusCode);
+            res.set('Content-Type', proxyRes.headers['content-type'] || 'application/json');
+            res.send(data);
+        });
+    });
+
+    proxyReq.on('error', (err) => {
+        console.error(`Proxy error: ${err.message}`);
+        res.status(502).json({ error: 'Bad Gateway', message: `Failed to reach Minecraft server: ${err.message}` });
+    });
+
+    proxyReq.setTimeout(120000, () => {
+        proxyReq.destroy();
+        res.status(504).json({ error: 'Gateway Timeout', message: 'Minecraft server did not respond in time' });
+    });
+
+    proxyReq.end();
+}
+
+// Minecraft server proxy routes (protected by API key)
+app.get('/minecraft', verifyApiKey, (req, res) => {
+    proxyToMinecraft('/', res);
+});
+
+app.get('/minecraft/start', verifyApiKey, (req, res) => {
+    proxyToMinecraft('/', res);
+});
+
+app.get('/minecraft/stop', verifyApiKey, (req, res) => {
+    proxyToMinecraft('/stop', res);
+});
+
+app.get('/minecraft/restart', verifyApiKey, (req, res) => {
+    proxyToMinecraft('/restart', res);
+});
+
+app.get('/minecraft/health', verifyApiKey, (req, res) => {
+    proxyToMinecraft('/health', res);
+});
+
 app.listen(port, '0.0.0.0', () => {
     console.log(`Webhook server listening on http://0.0.0.0:${port}`);
-    console.log('Remember to set GITHUB_WEBHOOK_SECRET environment variable for webhook validation.');
+    console.log('Environment variables:');
+    console.log(`  GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET ? 'set' : 'NOT SET (GitHub webhooks will fail)'}`);
+    console.log(`  API_KEY: ${API_KEY ? 'set' : 'NOT SET (API endpoints will fail)'}`);
 });
