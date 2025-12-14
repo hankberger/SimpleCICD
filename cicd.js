@@ -9,7 +9,6 @@ const http = require('http');
 // Minecraft server proxy config
 const MINECRAFT_SERVER = {
     host: '75.100.4.245',
-    port: 3000,
     apiKey: 'minecraft-restart!'
 };
 
@@ -180,7 +179,6 @@ app.post('/webhook', verifyGitHubWebhook, (req, res) => {
 function proxyToMinecraft(targetPath, res) {
     const options = {
         hostname: MINECRAFT_SERVER.host,
-        port: MINECRAFT_SERVER.port,
         path: targetPath,
         method: 'GET',
         headers: {
