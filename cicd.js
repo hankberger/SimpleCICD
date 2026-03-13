@@ -209,6 +209,38 @@ function proxyToMinecraft(targetPath, res) {
     proxyReq.end();
 }
 
+// CreativeFellowshipArtifact webhook endpoint
+app.post('/webhook/cfa', verifyGitHubWebhook, (req, res) => {
+    const scriptPath = path.join(__dirname, 'deploy-cfa.sh');
+
+    if (!fs.existsSync(scriptPath)) {
+        return res.status(500).json({ status: 'error', message: 'deploy-cfa.sh script not found' });
+    }
+
+    try {
+        fs.chmodSync(scriptPath, '755');
+
+        const deploy = spawn('bash', [scriptPath]);
+
+        deploy.stdout.on('data', (data) => {
+            console.log(`CFA deploy stdout: ${data}`);
+        });
+
+        deploy.stderr.on('data', (data) => {
+            console.error(`CFA deploy stderr: ${data}`);
+        });
+
+        deploy.on('close', (code) => {
+            console.log(`CFA deploy script exited with code ${code}`);
+        });
+
+        res.status(202).json({ status: 'success', message: 'CFA deployment script started' });
+    } catch (error) {
+        console.error(`Error executing CFA deploy script: ${error}`);
+        res.status(500).json({ status: 'error', message: `An error occurred: ${error.message}` });
+    }
+});
+
 // Minecraft server proxy routes (protected by API key)
 app.get('/minecraft', verifyApiKey, (req, res) => {
     proxyToMinecraft('/', res);

@@ -18,7 +18,8 @@ A simple CI/CD webhook server (Node.js/Express) that receives GitHub webhooks an
 |----------|--------|------|---------|
 | `/health` | GET | None | Health check |
 | `/` | GET | None | Redirect to h4nk.com |
-| `/webhook` | POST | GitHub Signature | CI/CD trigger |
+| `/webhook` | POST | GitHub Signature | CI/CD trigger (Portfolio) |
+| `/webhook/cfa` | POST | GitHub Signature | CI/CD trigger (CreativeFellowshipArtifact) |
 | `/minecraft` | GET | API Key | Start Minecraft server |
 | `/minecraft/start` | GET | API Key | Start Minecraft server |
 | `/minecraft/stop` | GET | API Key | Stop Minecraft server |
