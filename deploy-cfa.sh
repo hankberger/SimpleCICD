@@ -11,6 +11,9 @@ git pull || { echo "Git pull failed"; exit 1; }
 echo "Installing npm dependencies..."
 npm install || { echo "npm install failed"; exit 1; }
 
+echo "Cleaning old build artifacts..."
+rm -rf dist dist-server
+
 echo "Building the project (frontend + backend)..."
 npm run build || { echo "npm run build failed"; exit 1; }
 
